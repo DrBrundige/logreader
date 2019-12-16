@@ -2,8 +2,12 @@ import pandas as pd
 # from pandas import ExcelWriter
 # from pandas import ExcelFile
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from src.mysqlconnection import connectToMySQL
+
 import csv
+
+print("Log Reader Copyright T. Brundige Jones 2019")
 
 
 # A number of methods that read Computer lab logs
@@ -13,9 +17,11 @@ import csv
 # Accepts the name of workbook to read.
 # Accepts boolean output. If this is true, passes all_names to write_names()
 def read_workbook(book_name="lab_log_1912.xlsx", output=False):
+	print(f"Reading workbook with name {book_name}")
 	all_names = []
 	try:
 		book = pd.read_excel(book_name, sheet_name=None)
+		print("Book read successfully!")
 		for sheet_name in book:
 			read_sheet(book_name, sheet_name, all_names)
 	except Exception as e:
@@ -53,6 +59,93 @@ def read_sheet(book_name="lab_log_1912.xlsx", sheet_name="Day01", all_names=[]):
 		return False
 
 
+def read_sheet_to_db(book_name="labdb.xlsx", sheet_name="Day01"):
+	try:
+		sheet = pd.read_excel(book_name, sheet_name=sheet_name)
+
+		if sheet.columns[0] != "Last Name":
+			# print("Cell a1 must read 'Last Name'")
+			return False
+
+		current_day = sheet.columns.array[12]
+
+		data = sheet.values
+		successful_rows = 0
+		all_purposes = get_all_purposes()
+
+		for row in data:
+			user_id = get_user_id(row[1], row[0])
+			purpose_id = find_purpose_id(all_purposes, row[4])
+			time_in = current_day + timedelta(hours=row[2].hour, minutes=row[2].minute)
+			time_out = current_day + timedelta(hours=row[3].hour, minutes=row[3].minute)
+			span = time_out - time_in
+			mysql = connectToMySQL('computer_lab_log')
+			columns = "(timein, timeout, span, users_id, purposes_id)"
+			query = f"INSERT INTO timeclocks {columns} VALUES (%(i)s, %(o)s, %(s)s,%(u)s,%(p)s)"
+			data = {
+				"i": time_in,
+				"o": time_out,
+				"s": span.seconds,
+				"u": user_id,
+				"p": purpose_id,
+			}
+			username = mysql.query_db(query, data)
+
+			successful_rows += 1
+		# print(time_out)
+
+		return successful_rows
+	except Exception as e:
+		print("Errant operation inside Read Sheet!")
+		print(e)
+		return -1
+
+
+# Attempts to find given user in database
+# If it cannot be found, creates user
+# Either way returns in representing user id
+def get_user_id(first_name, last_name):
+	mysql = connectToMySQL('computer_lab_log')
+
+	query = "SELECT * FROM users WHERE first_name=%(f)s AND last_name=%(l)s"
+	data = {
+		"f": first_name,
+		"l": last_name,
+	}
+	username = mysql.query_db(query, data)
+	# if username is emp
+	if bool(username):
+		print("Username exists!")
+		return username[0]['id']
+	else:
+		print("Username does not exist!")
+		mysql = connectToMySQL('computer_lab_log')
+
+		query = "INSERT INTO users (first_name,last_name) VALUES (%(f)s, %(l)s)"
+		data = {
+			"f": first_name,
+			"l": last_name,
+		}
+		username = mysql.query_db(query, data)
+		return username
+
+
+def get_all_purposes():
+	mysql = connectToMySQL('computer_lab_log')
+	query = "SELECT id, purpose_name FROM purposes"
+	purposes = mysql.query_db(query)
+	return purposes
+
+
+def find_purpose_id(all_purposes, search):
+	for purpose in all_purposes:
+		if purpose["purpose_name"] == search:
+			return purpose["id"]
+
+	# Given search term has not been found. Returns 7, key for the UNKNOWN purpose
+	return 7
+
+
 # Writes contents of enclosed list to csv file
 def write_names(output_data):
 	print("Writing names")
@@ -78,9 +171,9 @@ def write_names(output_data):
 
 
 if __name__ == '__main__':
-	print("Log Reader Copyright T. Brundige Jones 2019")
-	# print(read_sheet("Total"))
-	# print(read_sheet())
-	all_names = read_workbook("lab_log_1912.xlsx", True)
-	print(all_names)
-# write_names(all_names)
+	print("Testing Log Reader")
+	print(read_sheet_to_db())
+# print(get_user_id("Big","Chungus"))
+# print(get_user_id("Thicc", "Bih"))
+# purposes = get_all_purposes()
+# print(find_purpose_id(purposes, "Internet"))
