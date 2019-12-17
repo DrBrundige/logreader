@@ -2,7 +2,7 @@ import pandas as pd
 # from pandas import ExcelWriter
 # from pandas import ExcelFile
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from src.mysqlconnection import connectToMySQL
 
 import csv
@@ -63,47 +63,84 @@ def read_sheet_to_db(book_name="labdb.xlsx", sheet_name="Day01"):
 	try:
 		sheet = pd.read_excel(book_name, sheet_name=sheet_name)
 
-		if sheet.columns[0] != "Last Name":
-			# print("Cell a1 must read 'Last Name'")
-			return False
+		assert sheet.columns[0] == "Last Name", "Cell A1 does not contain 'Last Name!' Skipping sheet!"
 
+		# assert len(sheet.columns.array) > 12, "Cell M1 must contain today's date!"
 		current_day = sheet.columns.array[12]
+		assert isinstance(current_day, datetime), "Cell M1 must contain today's date!"
 
 		data = sheet.values
 		successful_rows = 0
+		errant_rows = 0
+		total_rows = 1
 		all_purposes = get_all_purposes()
 
-		for row in data:
-			user_id = get_user_id(row[1], row[0])
-			purpose_id = find_purpose_id(all_purposes, row[4])
-			time_in = current_day + timedelta(hours=row[2].hour, minutes=row[2].minute)
-			time_out = current_day + timedelta(hours=row[3].hour, minutes=row[3].minute)
-			span = time_out - time_in
-			mysql = connectToMySQL('computer_lab_log')
-			columns = "(timein, timeout, span, users_id, purposes_id)"
-			query = f"INSERT INTO timeclocks {columns} VALUES (%(i)s, %(o)s, %(s)s,%(u)s,%(p)s)"
-			data = {
-				"i": time_in,
-				"o": time_out,
-				"s": span.seconds,
-				"u": user_id,
-				"p": purpose_id,
-			}
-			username = mysql.query_db(query, data)
-
-			successful_rows += 1
-		# print(time_out)
-
-		return successful_rows
-	except Exception as e:
-		print("Errant operation inside Read Sheet!")
+	except AssertionError as e:
+		print(f"Errant operation reading sheet {sheet_name}")
 		print(e)
 		return -1
+	except IndexError as e:
+		print(f"Errant operation reading sheet {sheet_name}")
+		print("Cell M1 must contain today's date!")
+		print(e)
+		return -1
+	except Exception as e:
+		print(f"Unknown error occured reading sheet {sheet_name}")
+		print(e)
+		return -1
+
+	for row in data:
+		try:
+			total_rows += 1
+			print(f"\nParsing data from row {total_rows}")
+
+			assert isinstance(row[0], str), "Last Name must be must be a string!"
+			assert isinstance(row[1], str), "First Name must be must be a string!"
+			assert isinstance(row[2], time), "Time In must be time object!"
+			assert isinstance(row[3], time), "Time Out must be must be a time object!"
+			assert isinstance(row[4], str), "Purpose must be must be a string!"
+
+			user_id = get_user_id(row[1], row[0])
+			if user_id == -1:
+				print("Invalid user id!")
+			else:
+				purpose_id = find_purpose_id(all_purposes, row[4])
+				time_in = current_day + timedelta(hours=row[2].hour, minutes=row[2].minute)
+				time_out = current_day + timedelta(hours=row[3].hour, minutes=row[3].minute)
+				span = time_out - time_in
+				assert time_in < time_out, "Span must be positive!"
+
+				mysql = connectToMySQL('computer_lab_log')
+				columns = "(timein, timeout, span, users_id, purposes_id)"
+				query = f"INSERT INTO timeclocks {columns} VALUES (%(i)s, %(o)s, %(s)s,%(u)s,%(p)s)"
+				data = {
+					"i": time_in,
+					"o": time_out,
+					"s": span.seconds,
+					"u": user_id,
+					"p": purpose_id,
+				}
+				timeclock = mysql.query_db(query, data)
+				if timeclock:
+					successful_rows += 1
+		except AssertionError as e:
+			print(f"Errant operation parsing row {total_rows} for sheet {sheet_name}")
+			errant_rows += 1
+			print(e)
+		except Exception as e:
+			print(f"Unknown error occurred parsing row {total_rows} for sheet {sheet_name}")
+			errant_rows += 1
+			print(e)
+
+	print(f"Complete! Added {successful_rows} rows")
+	if errant_rows > 0:
+		print(f"Errant rows: {errant_rows}")
+	return successful_rows
 
 
 # Attempts to find given user in database
 # If it cannot be found, creates user
-# Either way returns in representing user id
+# Either way returns int representing user id
 def get_user_id(first_name, last_name):
 	mysql = connectToMySQL('computer_lab_log')
 
@@ -115,10 +152,10 @@ def get_user_id(first_name, last_name):
 	username = mysql.query_db(query, data)
 	# if username is emp
 	if bool(username):
-		print("Username exists!")
+		# print("Username exists!")
 		return username[0]['id']
 	else:
-		print("Username does not exist!")
+		print("Username does not exist! Inserting username!")
 		mysql = connectToMySQL('computer_lab_log')
 
 		query = "INSERT INTO users (first_name,last_name) VALUES (%(f)s, %(l)s)"
@@ -127,6 +164,9 @@ def get_user_id(first_name, last_name):
 			"l": last_name,
 		}
 		username = mysql.query_db(query, data)
+		if username == False:
+			print("Username insertion unsuccessful!")
+			return -1
 		return username
 
 
@@ -172,7 +212,7 @@ def write_names(output_data):
 
 if __name__ == '__main__':
 	print("Testing Log Reader")
-	print(read_sheet_to_db())
+	read_sheet_to_db("labdb.xlsx", "Day02")
 # print(get_user_id("Big","Chungus"))
 # print(get_user_id("Thicc", "Bih"))
 # purposes = get_all_purposes()
