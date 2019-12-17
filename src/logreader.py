@@ -170,6 +170,7 @@ def get_user_id(first_name, last_name):
 		return username
 
 
+# Returns all purposes
 def get_all_purposes():
 	mysql = connectToMySQL('computer_lab_log')
 	query = "SELECT id, purpose_name FROM purposes"
@@ -177,6 +178,8 @@ def get_all_purposes():
 	return purposes
 
 
+# Returns an int representing the id of enclosed purpose
+# If purpose is not found, returns 7, id of UNKNOWN
 def find_purpose_id(all_purposes, search):
 	for purpose in all_purposes:
 		if purpose["purpose_name"] == search:
