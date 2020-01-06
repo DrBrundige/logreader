@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, time
 from src.mysqlconnection import connectToMySQL
 import csv
 
-print("Database Parser Copyright T. Brundige Jones 2019")
+print("Database Parser Copyright T. Brundige Jones 2020")
 
 
 # A number of methods that interact with the computer lab database including exporting data to CSV
@@ -79,7 +79,7 @@ def stack_clients(timecards, purpose=""):
 # Accepts dictionary returned from stack_clients
 # Outputs clients to a CSV file
 # Returns boolean based on whether the operation succeeded
-def write_stacked_clients(clients):
+def write_stacked_clients(clients, start="", end=""):
 	try:
 		assert isinstance(clients, dict), "Errant input! Clients must be a dictionary!"
 	except AssertionError as e:
@@ -94,7 +94,11 @@ def write_stacked_clients(clients):
 		with open(filename, 'w', newline='') as csvfile:
 			print("Preparing to write")
 			writer = csv.writer(csvfile, delimiter=',')
-			writer.writerow(["Name", "Total seconds", "Total time"])
+			# todo: Write timeframe in headers
+			if start == " " or end == "":
+				writer.writerow(["Name", "Total seconds", "Total time"])
+			else:
+				writer.writerow(["Name", "Total seconds", "Total time", f"Span: {start} - {end}"])
 			for key, value in clients.items():
 				writer.writerow([key, value, (value / 3600 / 24)])
 
@@ -108,19 +112,22 @@ def write_stacked_clients(clients):
 
 
 def run_report(start="", end=""):
-	if start == "" and end == "":
+	if start == "" or end == "":
 		start = datetime.today()
 		start = start - timedelta(hours=start.hour)
 		start = start - timedelta(minutes=start.minute)
 		start = start - timedelta(seconds=start.second)
 		start = start - timedelta(microseconds=start.microsecond)
+		start = start - timedelta(hours=start.hour)
 		end = start + timedelta(hours=24)
-		start = start - timedelta(hours=24)
+
+	# print(start)
+	# print(end)
 
 	timecards = get_range(start, end)
 	clients = stack_clients(timecards)
-	print(write_stacked_clients(clients))
+	print(write_stacked_clients(clients, start, end))
 
 
 if __name__ == '__main__':
-	run_report()
+	run_report("2019-12-06","2020-01-06")

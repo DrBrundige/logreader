@@ -7,7 +7,7 @@ from src.mysqlconnection import connectToMySQL
 
 import csv
 
-print("Log Reader Copyright T. Brundige Jones 2019")
+print("Log Reader Copyright T. Brundige Jones 2020")
 
 
 # A number of methods that read Computer lab logs
@@ -59,6 +59,32 @@ def read_sheet(book_name="lab_log_1912.xlsx", sheet_name="Day01", all_names=[]):
 		return False
 
 
+# read_workbook_to_db
+# reads a workbook, running read_sheet_to_db for each sheet
+# Accepts name of workbook as string
+# Returns total rows inserted as int
+def read_workbook_to_db(book_name="lab_log_1912.xlsx"):
+	print(f"Reading workbook with name {book_name}")
+	all_rows = 0
+	try:
+		book = pd.read_excel(book_name, sheet_name=None)
+		print("Book read successfully!")
+		for sheet_name in book:
+			book_rows = read_sheet_to_db(book_name, sheet_name)
+			if book_rows > 0:
+				all_rows += book_rows
+	except Exception as e:
+		print("Errant operation")
+		print(e)
+	else:
+		print(f"Complete! Inserted {all_rows} records!")
+	finally:
+		return all_rows
+
+
+# Reads an individual sheet of a workbook, inserting each row into database
+# Accepts names of book and sheet as strings
+# Returns number of successful insertions as an int. Returns -1 if operation fails
 def read_sheet_to_db(book_name="labdb.xlsx", sheet_name="Day01"):
 	try:
 		sheet = pd.read_excel(book_name, sheet_name=sheet_name)
@@ -215,7 +241,7 @@ def write_names(output_data):
 
 if __name__ == '__main__':
 	print("Testing Log Reader")
-	read_sheet_to_db("labdb.xlsx", "Day02")
+	read_workbook_to_db("prototype.xlsx")
 # print(get_user_id("Big","Chungus"))
 # print(get_user_id("Thicc", "Bih"))
 # purposes = get_all_purposes()
