@@ -63,7 +63,7 @@ def read_sheet(book_name="lab_log_1912.xlsx", sheet_name="Day01", all_names=[]):
 # reads a workbook, running read_sheet_to_db for each sheet
 # Accepts name of workbook as string
 # Returns total rows inserted as int
-def read_workbook_to_db(book_name="lab_log_1912.xlsx"):
+def read_workbook_to_db(book_name="prototype.xlsx"):
 	print(f"Reading workbook with name {book_name}")
 	all_rows = 0
 	try:
@@ -119,36 +119,53 @@ def read_sheet_to_db(book_name="labdb.xlsx", sheet_name="Day01"):
 		try:
 			total_rows += 1
 			print(f"\nParsing data from row {total_rows}")
+			has_timein = True
 
 			assert isinstance(row[0], str), "Last Name must be must be a string!"
 			assert isinstance(row[1], str), "First Name must be must be a string!"
-			assert isinstance(row[2], time), "Time In must be time object!"
-			assert isinstance(row[3], time), "Time Out must be must be a time object!"
+
+			if not (isinstance(row[2], time) and isinstance(row[3], time)):
+				has_timein = False
+				assert isinstance(row[5], float) or isinstance(row[5], time), "If timein is empty, Span must be a number or time!"
+			# assert isinstance(row[2], time), "Time In must be time object!"
+			# assert isinstance(row[3], time), "Time Out must be must be a time object!"
 			assert isinstance(row[4], str), "Purpose must be must be a string!"
 
 			user_id = get_user_id(row[1], row[0])
-			if user_id == -1:
-				print("Invalid user id!")
-			else:
-				purpose_id = find_purpose_id(all_purposes, row[4])
+			assert user_id != -1, "Invalid user id!"
+
+			purpose_id = find_purpose_id(all_purposes, row[4])
+			if has_timein:
 				time_in = current_day + timedelta(hours=row[2].hour, minutes=row[2].minute)
 				time_out = current_day + timedelta(hours=row[3].hour, minutes=row[3].minute)
 				span = time_out - time_in
+				span = span.seconds
 				assert time_in < time_out, "Span must be positive!"
+			else:
+				time_in = current_day
+				time_out = current_day
+				# Excel saves time objects as fractions of a day.
+				#   12:00 is .5, one hour is 1/24
+				#   To get this time in seconds, we multiply it by 24, then 3600
+				if isinstance(row[5], float):
+					assert row[5] < 1 and row[5] > 0, "If timein is empty, Span must be a positive integer less than 1!"
+					span = row[5] * 24 * 3600
+				else:
+					span = (row[5].hour * 3600) + row[5].second
 
-				mysql = connectToMySQL('computer_lab_log')
-				columns = "(timein, timeout, span, users_id, purposes_id)"
-				query = f"INSERT INTO timeclocks {columns} VALUES (%(i)s, %(o)s, %(s)s,%(u)s,%(p)s)"
-				data = {
-					"i": time_in,
-					"o": time_out,
-					"s": span.seconds,
-					"u": user_id,
-					"p": purpose_id,
-				}
-				timeclock = mysql.query_db(query, data)
-				if timeclock:
-					successful_rows += 1
+			mysql = connectToMySQL('computer_lab_log')
+			columns = "(timein, timeout, span, users_id, purposes_id)"
+			query = f"INSERT INTO timeclocks {columns} VALUES (%(i)s, %(o)s, %(s)s,%(u)s,%(p)s)"
+			data = {
+				"i": time_in,
+				"o": time_out,
+				"s": span,
+				"u": user_id,
+				"p": purpose_id,
+			}
+			timeclock = mysql.query_db(query, data)
+			if timeclock:
+				successful_rows += 1
 		except AssertionError as e:
 			print(f"Errant operation parsing row {total_rows} for sheet {sheet_name}")
 			errant_rows += 1
@@ -241,7 +258,7 @@ def write_names(output_data):
 
 if __name__ == '__main__':
 	print("Testing Log Reader")
-	read_workbook_to_db("prototype.xlsx")
+	read_sheet_to_db("labdb.xlsx", "Day02")
 # print(get_user_id("Big","Chungus"))
 # print(get_user_id("Thicc", "Bih"))
 # purposes = get_all_purposes()
