@@ -1,7 +1,7 @@
-import pandas as pd
 from datetime import datetime, timedelta, time
 from src.mysqlconnection import connectToMySQL
 from src.logreader import get_all_purposes
+# from time import sleep
 import csv
 
 print("Database Parser Copyright T. Brundige Jones 2020")
@@ -113,7 +113,7 @@ def stack_clients(timecards, purpose=""):
 # Accepts dictionary returned from stack_clients
 # Outputs clients to a CSV file
 # Returns boolean based on whether the operation succeeded
-def write_stacked_clients(clients, start="", end=""):
+def write_stacked_clients(clients, start="", end="", purpose=""):
 	try:
 		assert isinstance(clients, dict), "Errant input! Clients must be a dictionary!"
 	except AssertionError as e:
@@ -121,20 +121,30 @@ def write_stacked_clients(clients, start="", end=""):
 		return False
 
 	try:
-		filename = "out" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
-		# if __name__ != '__main__':
-		# 	filename = 'src/' + filename
+		filename = "out" + datetime.now().strftime("%Y%m%d-%H%M%S")
+		if purpose != "":
+			filename += "_" + purpose
+		filename += ".csv"
 
 		with open(filename, 'w', newline='') as csvfile:
 			print("Preparing to write")
 			writer = csv.writer(csvfile, delimiter=',')
-			if start == " " or end == "":
-				writer.writerow(["Name", "Total seconds", "Total time"])
-			else:
-				writer.writerow(["Name", "Total seconds", "Total time", f"Span: {start} - {end}"])
+			headers = ["Name", "Total seconds", "Total time"]
+			if start != "" and end != "":
+				headers.append(f"Span: {start} - {end}")
+			headers.append(purpose)
+			writer.writerow(headers)
+			total_clients = 0
+			total_time = 0
+
 			for key, value in clients.items():
 				writer.writerow([key, value, (value / 3600 / 24)])
-	# 			Writes summary information such as total clients and total hours
+				total_clients += 1
+				total_time += value
+
+			writer.writerow([])
+			writer.writerow(["Total:"])
+			writer.writerow([total_clients, total_time, (total_time / 3600 / 24)])
 
 	except Exception as e:
 		print("Errant operation writing stacked clients!")
@@ -200,13 +210,18 @@ def run_report(start="", end=""):
 
 	timecards = get_range(start, end)
 	clients = stack_clients(timecards)
-	print(write_stacked_clients(clients, start, end))
+	print(write_stacked_clients(clients, start, end, "uc"))
+
+	purpose = get_hours_by_purpose(timecards)
+	# sleep(1)
+	print(write_data(purpose, start, end, "tc"))
 
 
 if __name__ == '__main__':
 	# run_report("2019-12-06", "2020-01-06")
 	start = "2019-12-03"
 	end = "2020-01-11"
-	timecards = get_range(start, end)
-	data = get_hours_by_purpose(timecards)
-	write_data(data, start, end, "purposes")
+	run_report(start, end)
+# timecards = get_range(start, end)
+# data = get_hours_by_purpose(timecards)
+# write_data(data, start, end, "purposes")

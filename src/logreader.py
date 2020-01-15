@@ -1,6 +1,5 @@
-import pandas as pd
-# from pandas import ExcelWriter
-# from pandas import ExcelFile
+# import pandas as pd
+from pandas import read_excel
 
 from datetime import datetime, timedelta, time
 from src.mysqlconnection import connectToMySQL
@@ -20,7 +19,7 @@ def read_workbook(book_name="lab_log_1912.xlsx", output=False):
 	print(f"Reading workbook with name {book_name}")
 	all_names = []
 	try:
-		book = pd.read_excel(book_name, sheet_name=None)
+		book = read_excel(book_name, sheet_name=None)
 		print("Book read successfully!")
 		for sheet_name in book:
 			read_sheet(book_name, sheet_name, all_names)
@@ -40,7 +39,7 @@ def read_workbook(book_name="lab_log_1912.xlsx", output=False):
 # Returns list of names if successful, otherwise returns false
 def read_sheet(book_name="lab_log_1912.xlsx", sheet_name="Day01", all_names=[]):
 	try:
-		sheet = pd.read_excel(book_name, sheet_name=sheet_name)
+		sheet = read_excel(book_name, sheet_name=sheet_name)
 
 		if sheet.columns[0] != "Last Name":
 			# print("Cell a1 must read 'Last Name'")
@@ -67,7 +66,7 @@ def read_workbook_to_db(book_name="prototype.xlsx"):
 	print(f"Reading workbook with name {book_name}")
 	all_rows = 0
 	try:
-		book = pd.read_excel(book_name, sheet_name=None)
+		book = read_excel(book_name, sheet_name=None)
 		print("Book read successfully!")
 		for sheet_name in book:
 			book_rows = read_sheet_to_db(book_name, sheet_name)
@@ -87,7 +86,7 @@ def read_workbook_to_db(book_name="prototype.xlsx"):
 # Returns number of successful insertions as an int. Returns -1 if operation fails
 def read_sheet_to_db(book_name="labdb.xlsx", sheet_name="Day01"):
 	try:
-		sheet = pd.read_excel(book_name, sheet_name=sheet_name)
+		sheet = read_excel(book_name, sheet_name=sheet_name)
 
 		assert sheet.columns[0] == "Last Name", "Cell A1 does not contain 'Last Name!' Skipping sheet!"
 
